@@ -61,7 +61,7 @@ virtual-mouse/
 │
 ├── main.py        # Main application file
 ├── py.txt        # code python 
-├──python_setup.py   # Full comeents & virtual mapping guide
+├──python_setup.py   # Full comments & virtual mapping guide
 ├── requirements.txt        # All dependencies
 └── README.md               # Project documentation 
 ```
