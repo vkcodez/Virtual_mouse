@@ -1,0 +1,244 @@
+#cursor control code
+
+import cv2
+import mediapipe as mp
+import pyautogui
+import math
+from mediapipe.python.solutions import hands as mp_hands
+from mediapipe.python.solutions import drawing_utils as mp_drawing
+# Initialize
+cap = cv2.VideoCapture(0)
+hand_detector = mp_hands.Hands(max_num_hands=1, min_detection_confidence=0.8)
+drawing_utils = mp_drawing
+screen_width, screen_height = pyautogui.size()
+
+# State variables
+dragging = False
+
+while True:
+    _, frame = cap.read()
+    frame = cv2.flip(frame, 1)
+    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    output = hand_detector.process(rgb_frame)
+    hands = output.multi_hand_landmarks
+    fh, fw, _ = frame.shape
+
+    if hands:
+        for hand in hands:
+            drawing_utils.draw_landmarks(frame, hand)
+            landmarks = hand.landmark
+            
+            # 1. Get Coordinates
+            # Index (8), Thumb (4), Middle (12)
+            idx = landmarks[8]
+            tmb = landmarks[4]
+            mid = landmarks[12]
+
+            ix, iy = int(idx.x * fw), int(idx.y * fh)
+            tx, ty = int(tmb.x * fw), int(tmb.y * fh)
+            mx, my = int(mid.x * fw), int(mid.y * fh)
+
+            # Map to Screen
+            mouse_x = screen_width / fw * ix
+            mouse_y = screen_height / fh * iy
+
+            # 2. Movement
+            pyautogui.moveTo(mouse_x, mouse_y, _pause=False)
+
+            # 3. Drag and Drop Logic (Thumb + Index Pinch)
+            dist_click = math.hypot(ix - tx, iy - ty)
+            if dist_click < 35:
+                if not dragging:
+                    pyautogui.mouseDown()
+                    dragging = True
+                    cv2.putText(frame, "DRAGGING", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            else:
+                if dragging:
+                    pyautogui.mouseUp()
+                    dragging = False
+
+            # 4. Right Click Logic (Index + Middle Pinch)
+            dist_right = math.hypot(ix - mx, iy - my)
+            if dist_right < 35:
+                pyautogui.rightClick()
+                pyautogui.sleep(0.3) # Prevent multiple rapid clicks
+
+    cv2.imshow('Virtual Mouse Pro', frame)
+    if cv2.waitKey(1) & 0xFF == 27:
+        break
+
+cap.release()
+cv2.destroyAllWindows()
+
+
+
+
+#nxt code hand color
+
+
+import cv2
+import mediapipe as mp
+mp_drawing = mp.solutions.drawing_utils
+mp_drawing_styles = mp.solutions.drawing_styles
+mp_hands = mp.solutions.hands
+
+# For static images:
+IMAGE_FILES = []
+with mp_hands.Hands(
+    static_image_mode=True,
+    max_num_hands=2,
+    min_detection_confidence=0.5) as hands:
+  for idx, file in enumerate(IMAGE_FILES):
+    # Read an image, flip it around y-axis for correct handedness output (see
+    # above).
+    image = cv2.flip(cv2.imread(file), 1)
+    # Convert the BGR image to RGB before processing.
+    results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+
+    # Print handedness and draw hand landmarks on the image.
+    print('Handedness:', results.multi_handedness)
+    if not results.multi_hand_landmarks:
+      continue
+    image_height, image_width, _ = image.shape
+    annotated_image = image.copy()
+    for hand_landmarks in results.multi_hand_landmarks:
+      print('hand_landmarks:', hand_landmarks)
+      print(
+          f'Index finger tip coordinates: (',
+          f'{hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].x * image_width}, '
+          f'{hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].y * image_height})'
+      )
+      mp_drawing.draw_landmarks(
+          annotated_image,
+          hand_landmarks,
+          mp_hands.HAND_CONNECTIONS,
+          mp_drawing_styles.get_default_hand_landmarks_style(),
+          mp_drawing_styles.get_default_hand_connections_style())
+    cv2.imwrite(
+        '/tmp/annotated_image' + str(idx) + '.png', cv2.flip(annotated_image, 1))
+    # Draw hand world landmarks.
+    if not results.multi_hand_world_landmarks:
+      continue
+    for hand_world_landmarks in results.multi_hand_world_landmarks:
+      mp_drawing.plot_landmarks(
+        hand_world_landmarks, mp_hands.HAND_CONNECTIONS, azimuth=5)
+
+# For webcam input:
+cap = cv2.VideoCapture(0)
+with mp_hands.Hands(
+    model_complexity=0,
+    min_detection_confidence=0.5,
+    min_tracking_confidence=0.5) as hands:
+  while cap.isOpened():
+    success, image = cap.read()
+    if not success:
+      print("Ignoring empty camera frame.")
+      # If loading a video, use 'break' instead of 'continue'.
+      continue
+
+    # To improve performance, optionally mark the image as not writeable to
+    # pass by reference.
+    image.flags.writeable = False
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    results = hands.process(image)
+
+    # Draw the hand annotations on the image.
+    image.flags.writeable = True
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+    if results.multi_hand_landmarks:
+      for hand_landmarks in results.multi_hand_landmarks:
+        mp_drawing.draw_landmarks(
+            image,
+            hand_landmarks,
+            mp_hands.HAND_CONNECTIONS,
+            mp_drawing_styles.get_default_hand_landmarks_style(),
+            mp_drawing_styles.get_default_hand_connections_style())
+    # Flip the image horizontally for a selfie-view display.
+    cv2.imshow('MediaPipe Hands', cv2.flip(image, 1))
+    if cv2.waitKey(5) & 0xFF == 27:
+      break
+cap.release()
+
+
+import cv2
+import mediapipe as mp
+mp_drawing = mp.solutions.drawing_utils
+mp_drawing_styles = mp.solutions.drawing_styles
+mp_hands = mp.solutions.hands
+
+# For static images:
+IMAGE_FILES = []
+with mp_hands.Hands(
+    static_image_mode=True,
+    max_num_hands=2,
+    min_detection_confidence=0.5) as hands:
+  for idx, file in enumerate(IMAGE_FILES):
+    # Read an image, flip it around y-axis for correct handedness output (see
+    # above).
+    image = cv2.flip(cv2.imread(file), 1)
+    # Convert the BGR image to RGB before processing.
+    results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+
+    # Print handedness and draw hand landmarks on the image.
+    print('Handedness:', results.multi_handedness)
+    if not results.multi_hand_landmarks:
+      continue
+    image_height, image_width, _ = image.shape
+    annotated_image = image.copy()
+    for hand_landmarks in results.multi_hand_landmarks:
+      print('hand_landmarks:', hand_landmarks)
+      print(
+          f'Index finger tip coordinates: (',
+          f'{hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].x * image_width}, '
+          f'{hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP].y * image_height})'
+      )
+      mp_drawing.draw_landmarks(
+          annotated_image,
+          hand_landmarks,
+          mp_hands.HAND_CONNECTIONS,
+          mp_drawing_styles.get_default_hand_landmarks_style(),
+          mp_drawing_styles.get_default_hand_connections_style())
+    cv2.imwrite(
+        '/tmp/annotated_image' + str(idx) + '.png', cv2.flip(annotated_image, 1))
+    # Draw hand world landmarks.
+    if not results.multi_hand_world_landmarks:
+      continue
+    for hand_world_landmarks in results.multi_hand_world_landmarks:
+      mp_drawing.plot_landmarks(
+        hand_world_landmarks, mp_hands.HAND_CONNECTIONS, azimuth=5)
+
+# For webcam input:
+cap = cv2.VideoCapture(0)
+with mp_hands.Hands(
+    model_complexity=0,
+    min_detection_confidence=0.5,
+    min_tracking_confidence=0.5) as hands:
+  while cap.isOpened():
+    success, image = cap.read()
+    if not success:
+      print("Ignoring empty camera frame.")
+      # If loading a video, use 'break' instead of 'continue'.
+      continue
+
+    # To improve performance, optionally mark the image as not writeable to
+    # pass by reference.
+    image.flags.writeable = False
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    results = hands.process(image)
+
+    # Draw the hand annotations on the image.
+    image.flags.writeable = True
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+    if results.multi_hand_landmarks:
+      for hand_landmarks in results.multi_hand_landmarks:
+        mp_drawing.draw_landmarks(
+            image,
+            hand_landmarks,
+            mp_hands.HAND_CONNECTIONS,
+            mp_drawing_styles.get_default_hand_landmarks_style(),
+            mp_drawing_styles.get_default_hand_connections_style())
+    # Flip the image horizontally for a selfie-view display.
+    cv2.imshow('MediaPipe Hands', cv2.flip(image, 1))
+    if cv2.waitKey(5) & 0xFF == 27:
+      break
+cap.release()
